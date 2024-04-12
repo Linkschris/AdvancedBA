@@ -31,6 +31,8 @@ class BatteryManagementEnv(Env):
 
     def step(self, action):
 
+        done= False
+
         action_1 = [1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0]
         action_2 = [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1]
 
@@ -39,27 +41,30 @@ class BatteryManagementEnv(Env):
         elif action == 1:
             selected_action = action_2
         
-
+        self.charge_level = 0
         total_reward = 0
 
         for hour_action in selected_action:
             reward = 0
             if hour_action == 1:  # charge
                 new_charge_level = self.charge_level + self.charge_rate
-                if new_charge_level < self.max_charge:
+                if new_charge_level <= self.max_charge:
                     self.charge_level = new_charge_level
-                    reward += 20
+                    reward += 7.5
                 else:
-                    reward += -100  # Penalty for trying to overcharge
+                    reward += -12.5  # Penalty for trying to overcharge
 
             elif hour_action == 0:  # discharge
                 new_charge_level = self.charge_level - self.discharge_rate
-                if new_charge_level > self.min_charge:
+                if new_charge_level >= self.min_charge:
                     self.charge_level = new_charge_level
-                    reward += 10
+                    reward += 7.5
                 else:
-                    reward += -100  # Penalty for trying to overdischarge
+                    reward += -12.5  # Penalty for trying to overdischarge
 
             total_reward += reward
+        done = True
 
-        return np.array([self.charge_level]).astype(np.float32), total_reward
+        info = {}  # Additional information
+
+        return np.array([self.charge_level]).astype(np.float32), total_reward, done, info
