@@ -33,13 +33,17 @@ class BatteryManagementEnv(Env):
 
         done= False
 
-        action_1 = [1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0]
-        action_2 = [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1]
+        action_1 = [0,0,0,0,1,1,1,1,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0]
+        action_2 = [-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1]
+        action_3 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
-        if action == 0:
-            selected_action = action_1
-        elif action == 1:
-            selected_action = action_2
+        switcher = {
+            0: action_1,
+            1: action_2,
+            2: action_3
+        }
+
+        selected_action = switcher.get(action, "Invalid action")
         
         self.charge_level = 0
         total_reward = 0
@@ -54,13 +58,16 @@ class BatteryManagementEnv(Env):
                 else:
                     reward += -12.5  # Penalty for trying to overcharge
 
-            elif hour_action == 0:  # discharge
+            elif hour_action == -1:  # discharge
                 new_charge_level = self.charge_level - self.discharge_rate
                 if new_charge_level >= self.min_charge:
                     self.charge_level = new_charge_level
                     reward += 7.5
                 else:
                     reward += -12.5  # Penalty for trying to overdischarge
+
+            elif hour_action == 0:  # do nothing
+                reward += 0
 
             total_reward += reward
         done = True
