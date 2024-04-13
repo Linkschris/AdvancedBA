@@ -4,18 +4,16 @@ from gym import Env, spaces
 from gym.utils import seeding
 
 #load csv file
-prices = pd.read_csv('../Data/prices.csv')
-#change n/e values to np.NaN
-prices = prices.replace('n/e', np.NaN)
-prices.dropna(inplace=True)
-prices.reset_index(drop=True, inplace=True)
-countries = prices.columns[1:]
-#change column dtype
-for country in countries:
-    prices[country] = prices[country].astype(float)
+data = pd.read_csv('../Data/data.csv')
+prices = data[['price_GER']]
+solar = data[['solar_forecastGER']]
+wind_on = data[['windonshore_forecastGER']]
+wind_off = data[['windoffshore_forecastGER']]
+residual_gen = data[['residual_generationGER']]
+load = data[['load_GER']]
+industrial_demand = data[['industrial_demand']]
+day_of_week = data[['day_of_week']]
 
-    #load csv file
-res_gen = pd.read_csv('../Data/res_gen.csv')
 
 class BatteryManagementEnv(Env):
 
@@ -27,9 +25,9 @@ class BatteryManagementEnv(Env):
         self.max_episode_len = 365  # Maximum number of steps in an episode
 
         # Set other needed variables like the charge rate, discharge rate, etc.
-        self.charge_rate = 5  # Amount of charge to increase per step when charging
-        self.discharge_rate = 5  # Amount of charge to decrease per step when discharging
-        self.max_charge = 100
+        self.charge_rate = 1500  # Amount of charge to increase per step when charging
+        self.discharge_rate = 1500  # Amount of charge to decrease per step when discharging
+        self.max_charge = 15000
         self.min_charge = 0
 
         self.nA = 5
@@ -50,7 +48,7 @@ class BatteryManagementEnv(Env):
         solar = self.get_solar(0)
         hours = range(24)
 
-        self.state = np.array([SoC]+solar+hours)
+        self.state = np.array([SoC]+solar)
         self.lastaction = None
         self.lastreward = None
 
@@ -62,12 +60,16 @@ class BatteryManagementEnv(Env):
         return list(prices['price_GER'][day*24:day*24+24])
     
     def get_solar(self, day):
-        return list(res_gen['solar_forecastGER'][day*24:day*24+24])
+        return list(solar['solar_forecastGER'][day*24:day*24+24])
+    
+    def get_industrial_demand(self, day):
+        return list(industrial_demand['industrial_demand'][day*24:day*24+24])
     
     def step(self, action):
         self.lastaction = action
 
         prices = self.get_prices(self.t)
+        industrial_demand = self.get_industrial_demand(self.t)
         self.state[1:] = self.get_solar(self.t)
 
 
@@ -92,32 +94,36 @@ class BatteryManagementEnv(Env):
         selected_action = switcher.get(action, "Invalid action")
         
         #self.charge_level = 0
-        daily_reward = 0
+        daily_cost = 0
 
         for hour in range(24):
-            reward = 0
+            cost = 0
             if selected_action[hour] == 1:  # charge
                 new_charge_level = self.state[0] + self.charge_rate
                 if new_charge_level <= self.max_charge:
                     self.state[0] = new_charge_level
                     #print(self.t,hour, prices)
-                    reward += -self.charge_rate*prices[hour]
+                    cost += (self.charge_rate + industrial_demand[hour])*prices[hour]
                 else:
-                    reward += -10  # Penalty for trying to overcharge
+                    cost += 100000  # Penalty for trying to overcharge
 
             elif selected_action[hour] == -1:  # discharge
                 new_charge_level = self.state[0] - self.discharge_rate
                 if new_charge_level >= self.min_charge:
                     self.state[0] = new_charge_level
-                    reward += self.discharge_rate*prices[hour]
+                    cost += -(self.discharge_rate - industrial_demand[hour])*prices[hour]
                 else:
-                    reward += -10  # Penalty for trying to overdischarge
+                    cost += 100000  # Penalty for trying to overdischarge
 
             elif selected_action[hour] == 0:  # do nothing
-                reward += 0
+                cost += industrial_demand[hour]*prices[hour]
 
-            daily_reward += reward
-        
+            daily_cost += cost
+        #print(prices)
+        #print("Daily cost:", daily_cost)
+        #print("Original costs:", sum([a*b for a,b in zip(prices, industrial_demand)]))
+
+        daily_reward = (sum([a*b for a,b in zip(prices, industrial_demand)]) - daily_cost)/100000
         self.total_reward += daily_reward
         self.lastreward = daily_reward
         self.t += 1
