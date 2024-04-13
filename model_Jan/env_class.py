@@ -5,13 +5,13 @@ from gym.utils import seeding
 class BatteryManagementEnv(Env):
 
     def __init__(self):
-        self.charge_level = 0  # Initial battery charge level
+        self.charge_level = 50  # Initial battery charge level
         self.action_space = 1  # 24-hour action vector with actions -1, 0, or 1
         self.observation_space = 1  # Battery charge level as a float
 
         # Set other needed variables like the charge rate, discharge rate, etc.
-        self.charge_rate = 10  # Amount of charge to increase per step when charging
-        self.discharge_rate = 10  # Amount of charge to decrease per step when discharging
+        self.charge_rate = 5  # Amount of charge to increase per step when charging
+        self.discharge_rate = 5  # Amount of charge to decrease per step when discharging
         self.max_charge = 100
         self.min_charge = 0
 
@@ -31,21 +31,25 @@ class BatteryManagementEnv(Env):
 
     def step(self, action):
 
+        old_charge_level = self.charge_level
+
         done= False
 
         action_1 = [0,0,0,0,1,1,1,1,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0]
         action_2 = [-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1]
         action_3 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        action_4 = [0,0,0,0,-1,-1,-1,-1,1,1,1,1,1,1,1,1,-1,-1,-1,-1,0,0,0,0]
 
         switcher = {
             0: action_1,
             1: action_2,
-            2: action_3
+            2: action_3,
+            3: action_4
         }
 
         selected_action = switcher.get(action, "Invalid action")
         
-        self.charge_level = 0
+        #self.charge_level = 0
         total_reward = 0
 
         for hour_action in selected_action:
@@ -73,5 +77,7 @@ class BatteryManagementEnv(Env):
         done = True
 
         info = {}  # Additional information
+
+        print("Action:", action, "Old charge level:",old_charge_level, " Charge level:", self.charge_level, " Reward:", total_reward)
 
         return np.array([self.charge_level]).astype(np.float32), total_reward, done, info
