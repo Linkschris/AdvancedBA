@@ -80,15 +80,41 @@ class BatteryManagementEnv(Env):
         action_0 = [1]*8+[-1]*8+[1]*8
         action_1 = [-1]*8+[1]*8+[-1]*8
         action_2 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-        action_3 = [1]*6+[-1]*5+[1]*6+[-1]*3+[1]*4#[0,0,0,0,-1,-1,-1,-1,1,1,1,1,1,1,1,1,-1,-1,-1,-1,0,0,0,0]
-        action_4 = [-1]*6+[1]*5+[-1]*6+[1]*3+[-1]*4
+        action_3 = [-0.32908258, -0.09591184,  0.02884006,  0.1155446 ,  0.1362936 ,
+        0.09953183, -0.05332585, -0.20597152, -0.20619535, -0.00375301,
+        0.25355506,  0.39953504,  0.60008256,  0.87294083,  1.        ,
+        0.85863536,  0.54955856,  0.02666993, -0.54452552, -0.93428972,
+       -1.        , -0.83623318, -0.7262561 , -0.38906533] #summer plan
+        action_4 = [ 0.55270185,  0.80394396,  0.92105201,  1.        ,  0.94345696,
+        0.62038445, -0.21776353, -0.70342632, -0.74746067, -0.38508783,
+       -0.0577231 ,  0.21024989,  0.49863939,  0.73273232,  0.81381002,
+        0.68026072,  0.41151014, -0.18105938, -0.62959089, -1.        ,
+       -0.83446471, -0.45384348, -0.21452104,  0.24968145] #autumn plan
+        action_5 = [ 0.64944974,  0.79791761,  0.90065498,  1.        ,  0.95809578,
+        0.7370679 ,  0.22651948, -0.4104339 , -0.73879535, -0.66994322,
+       -0.49958381, -0.42005924, -0.26056604, -0.1397956 , -0.16212546,
+       -0.3006938 , -0.50535707, -0.95602399, -1.        , -0.74057248,
+       -0.24448104,  0.15298918,  0.28904361,  0.69328197]
+        action_6 = [ 1.,  1.,  1.,  1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1.,
+       -1., -1., -1., -1., -1., -1., -1., -1.,  1.,  1.,  1.] #winter
+        action_7 = [ 1.,  1.,  1.,  1.,  1.,  1., -1., -1., -1., -1., -1.,  1.,  1.,
+        1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1.,  1.] #autumn
+        action_8 = [-1., -1.,  1.,  1.,  1.,  1., -1., -1., -1., -1.,  1.,  1.,  1.,
+        1.,  1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1.] #summer
+        
+
+
 
         switcher = {
             0: action_0,
             1: action_1,
             2: action_2,
             3: action_3,
-            4: action_4
+            4: action_4,
+            5: action_5,
+            6: action_6,
+            7: action_7,
+            8: action_8
         }
 
         selected_action = switcher.get(action, "Invalid action")
@@ -98,22 +124,22 @@ class BatteryManagementEnv(Env):
 
         for hour in range(24):
             cost = 0
-            if selected_action[hour] == 1:  # charge
-                new_charge_level = self.state[0] + self.charge_rate
+            if selected_action[hour] > 0:  # charge
+                new_charge_level = self.state[0] + self.charge_rate*selected_action[hour]
                 if new_charge_level <= self.max_charge:
                     self.state[0] = new_charge_level
                     #print(self.t,hour, prices)
-                    cost += (self.charge_rate + industrial_demand[hour])*prices[hour]
+                    cost += (self.charge_rate*selected_action[hour] + industrial_demand[hour])*prices[hour]
                 else:
-                    cost += 100000  # Penalty for trying to overcharge
+                    cost += 100000 + industrial_demand[hour]*prices[hour]  # Penalty for trying to overcharge
 
-            elif selected_action[hour] == -1:  # discharge
-                new_charge_level = self.state[0] - self.discharge_rate
+            elif selected_action[hour] < 0:  # discharge
+                new_charge_level = self.state[0] - self.discharge_rate*selected_action[hour]
                 if new_charge_level >= self.min_charge:
                     self.state[0] = new_charge_level
-                    cost += -(self.discharge_rate - industrial_demand[hour])*prices[hour]
+                    cost += -(self.discharge_rate*selected_action[hour] - industrial_demand[hour])*prices[hour]
                 else:
-                    cost += 100000  # Penalty for trying to overdischarge
+                    cost += 100000 + industrial_demand[hour]*prices[hour]  # Penalty for trying to overdischarge
 
             elif selected_action[hour] == 0:  # do nothing
                 cost += industrial_demand[hour]*prices[hour]
