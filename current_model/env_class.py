@@ -6,13 +6,13 @@ from gym.utils import seeding
 #load csv file
 data = pd.read_csv('../Data/data.csv')
 prices = data[['price_GER']]
-solar = data[['solar_forecastGER']]
-wind_on = data[['windonshore_forecastGER']]
-wind_off = data[['windoffshore_forecastGER']]
-residual_gen = data[['residual_generationGER']]
-load = data[['load_GER']]
+# solar = data[['solar_forecastGER']]
+# wind_on = data[['windonshore_forecastGER']]
+# wind_off = data[['windoffshore_forecastGER']]
+# residual_gen = data[['residual_generationGER']]
+# load = data[['load_GER']]
 industrial_demand = data[['industrial_demand']]
-day_of_week = data[['day_of_week']]
+# day_of_week = data[['day_of_week']]
 
 
 class BatteryManagementEnv(Env):
@@ -21,16 +21,16 @@ class BatteryManagementEnv(Env):
         #self.charge_level = 50  # Initial battery charge level
         self.start_day = start_day
         self.action_space = 1  # 24-hour action vector with actions -1, 0, or 1
-        self.observation_space = 25  # Battery charge level as a float
-        self.max_episode_len = 365  # Maximum number of steps in an episode
+        self.observation_space = 121  # Battery charge level as a float
+        self.max_episode_len = 730  # Maximum number of steps in an episode
 
         # Set other needed variables like the charge rate, discharge rate, etc.
-        self.charge_rate = 1500  # Amount of charge to increase per step when charging
-        self.discharge_rate = 1500  # Amount of charge to decrease per step when discharging
+        self.charge_rate = 15  # Amount of charge to increase per step when charging
+        self.discharge_rate = 15  # Amount of charge to decrease per step when discharging
         self.max_charge = 15000
         self.min_charge = 0
 
-        self.nA = 5
+        self.nA = 9
 
         self.seed()
         self.reset()
@@ -45,12 +45,14 @@ class BatteryManagementEnv(Env):
         self.charge_level = 10  # Or some other logic to determine initial charge level
         SoC = 10
 
-        solar = self.get_solar(0)
+        input = self.get_input_data(0)
+        #solar = self.get_solar(0)
         hours = range(24)
 
-        self.state = np.array([SoC]+solar)
+        self.state = np.array([SoC]+input)
         self.lastaction = None
         self.lastreward = None
+        self.list_of_soc = []
 
         self.total_reward = 0
 
@@ -59,8 +61,14 @@ class BatteryManagementEnv(Env):
     def get_prices(self, day):
         return list(prices['price_GER'][day*24:day*24+24])
     
-    def get_solar(self, day):
-        return list(solar['solar_forecastGER'][day*24:day*24+24])
+    def get_input_data(self, day):
+        input_array = list(data['solar_forecastGER'][day*24:day*24+24])
+        input_array += list(data['windonshore_forecastGER'][day*24:day*24+24])
+        input_array += list(data['windoffshore_forecastGER'][day*24:day*24+24])
+        input_array += list(data['load_GER'][day*24:day*24+24])
+        input_array += list(data['month'][day*24:day*24+24])
+
+        return input_array
     
     def get_industrial_demand(self, day):
         return list(industrial_demand['industrial_demand'][day*24:day*24+24])
@@ -69,8 +77,9 @@ class BatteryManagementEnv(Env):
         self.lastaction = action
 
         prices = self.get_prices(self.t)
+        input = self.get_input_data(self.t)
         industrial_demand = self.get_industrial_demand(self.t)
-        self.state[1:] = self.get_solar(self.t)
+        self.state[1:] = input
 
 
         old_charge_level = self.state[0]
@@ -153,6 +162,7 @@ class BatteryManagementEnv(Env):
         self.total_reward += daily_reward
         self.lastreward = daily_reward
         self.t += 1
+        self.list_of_soc += self.state[0]
 
         if self.t-self.start_day >= self.max_episode_len:
             return (self.state, daily_reward, True, {})  # (nextstate, reward, done, info)
