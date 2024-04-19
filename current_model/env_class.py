@@ -81,7 +81,6 @@ class BatteryManagementEnv(Env):
         industrial_demand = self.get_industrial_demand(self.t)
         self.state[1:] = input
 
-
         old_charge_level = self.state[0]
 
         done= False
@@ -110,9 +109,6 @@ class BatteryManagementEnv(Env):
         1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1.,  1.] #autumn
         action_8 = [-1., -1.,  1.,  1.,  1.,  1., -1., -1., -1., -1.,  1.,  1.,  1.,
         1.,  1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1.] #summer
-        
-
-
 
         switcher = {
             0: action_0,
