@@ -13,6 +13,7 @@ prices = data[['price_GER']]
 # load = data[['load_GER']]
 industrial_demand = data[['industrial_demand']]
 # day_of_week = data[['day_of_week']]
+action_plans = pd.read_csv('../final_project/action_plans.csv', header=0)
 
 
 class BatteryManagementEnv(Env):
@@ -30,7 +31,7 @@ class BatteryManagementEnv(Env):
         self.max_charge = 15000
         self.min_charge = 0
 
-        self.nA = 9
+        self.nA = action_plans.shape[1]
 
         self.seed()
         self.reset()
@@ -85,44 +86,16 @@ class BatteryManagementEnv(Env):
 
         done= False
 
-        action_0 = [1]*8+[-1]*8+[1]*8
-        action_1 = [-1]*8+[1]*8+[-1]*8
-        action_2 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-        action_3 = [-0.32908258, -0.09591184,  0.02884006,  0.1155446 ,  0.1362936 ,
-        0.09953183, -0.05332585, -0.20597152, -0.20619535, -0.00375301,
-        0.25355506,  0.39953504,  0.60008256,  0.87294083,  1.        ,
-        0.85863536,  0.54955856,  0.02666993, -0.54452552, -0.93428972,
-       -1.        , -0.83623318, -0.7262561 , -0.38906533] #summer plan
-        action_4 = [ 0.55270185,  0.80394396,  0.92105201,  1.        ,  0.94345696,
-        0.62038445, -0.21776353, -0.70342632, -0.74746067, -0.38508783,
-       -0.0577231 ,  0.21024989,  0.49863939,  0.73273232,  0.81381002,
-        0.68026072,  0.41151014, -0.18105938, -0.62959089, -1.        ,
-       -0.83446471, -0.45384348, -0.21452104,  0.24968145] #autumn plan
-        action_5 = [ 0.64944974,  0.79791761,  0.90065498,  1.        ,  0.95809578,
-        0.7370679 ,  0.22651948, -0.4104339 , -0.73879535, -0.66994322,
-       -0.49958381, -0.42005924, -0.26056604, -0.1397956 , -0.16212546,
-       -0.3006938 , -0.50535707, -0.95602399, -1.        , -0.74057248,
-       -0.24448104,  0.15298918,  0.28904361,  0.69328197]
-        action_6 = [ 1.,  1.,  1.,  1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1.,
-       -1., -1., -1., -1., -1., -1., -1., -1.,  1.,  1.,  1.] #winter
-        action_7 = [ 1.,  1.,  1.,  1.,  1.,  1., -1., -1., -1., -1., -1.,  1.,  1.,
-        1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1.,  1.] #autumn
-        action_8 = [-1., -1.,  1.,  1.,  1.,  1., -1., -1., -1., -1.,  1.,  1.,  1.,
-        1.,  1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1.] #summer
+        # Initialize an empty dictionary to store the column data
+        action_dict = {}
 
-        switcher = {
-            0: action_0,
-            1: action_1,
-            2: action_2,
-            3: action_3,
-            4: action_4,
-            5: action_5,
-            6: action_6,
-            7: action_7,
-            8: action_8
-        }
+        # Loop over the columns in the DataFrame
+        for i in range(action_plans.shape[1]):
+            # Store the column data in the dictionary
+            action_dict[i] = list(action_plans.iloc[:, i])
 
-        selected_action = switcher.get(action, "Invalid action")
+
+        selected_action = action_dict[action]
         
         #self.charge_level = 0
         daily_cost = 0
@@ -139,7 +112,7 @@ class BatteryManagementEnv(Env):
                     cost += 100000 + industrial_demand[hour]*prices[hour]  # Penalty for trying to overcharge
 
             elif selected_action[hour] < 0:  # discharge
-                new_charge_level = self.state[0] - self.discharge_rate*selected_action[hour]
+                new_charge_level = self.state[0] + self.discharge_rate*selected_action[hour]
                 if new_charge_level >= self.min_charge:
                     self.state[0] = new_charge_level
                     cost += -(self.discharge_rate*selected_action[hour] - industrial_demand[hour])*prices[hour]
@@ -154,7 +127,9 @@ class BatteryManagementEnv(Env):
         #print("Daily cost:", daily_cost)
         #print("Original costs:", sum([a*b for a,b in zip(prices, industrial_demand)]))
 
-        daily_reward = (sum([a*b for a,b in zip(prices, industrial_demand)]) - daily_cost)/100000
+        #print("Charge level:", self.state[0], " Reward:", daily_cost, " Total reward:", self.total_reward)
+
+        daily_reward = (sum([a*b for a,b in zip(prices, industrial_demand)]) - daily_cost)
         self.total_reward += daily_reward
         self.lastreward = daily_reward
         self.t += 1
